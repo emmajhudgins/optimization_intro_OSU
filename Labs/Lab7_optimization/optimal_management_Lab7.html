@@ -666,7 +666,8 @@ legend(&#39;topright&#39;,pch=21, legend=c(&quot;insecticide&quot;, &#39;spray&#
 <p>Let’s assume, as before: <span class="math inline">\(B=60\)</span> total budget<br />
 <span class="math inline">\(p0 = (p0_{i=1}, p0_{i=2},...p0_{i=n})\)</span><br />
 <br />
-But simplify to one type of management: <span class="math inline">\(c = 15\)</span>, cost of management<br />
+But simplify to one type of management:<br />
+<span class="math inline">\(c = 15\)</span>, cost of management<br />
 <span class="math inline">\(\epsilon=0.5\)</span>, efficiency of management<br />
 <br />
 </p>
@@ -752,21 +753,15 @@ plot(pestgrid, col=viridis(9), breaks=seq(0,1,length.out=10), main=&quot;Initial
 ## Long-step dual simplex will be used
 ## +   194: mip =     not found yet &gt;=              -inf        (1; 0)
 ## +   253: &gt;&gt;&gt;&gt;&gt;   9.800644876e+00 &gt;=   8.066050616e+00  17.7% (17; 0)
-## + 19887: mip =   9.800644876e+00 &gt;=   9.237930323e+00   5.7% (2729; 847)
-## + 33144: mip =   9.800644876e+00 &gt;=   9.376707706e+00   4.3% (4198; 1622)
+## + 22795: mip =   9.800644876e+00 &gt;=   9.276219559e+00   5.4% (3075; 1002)
+## + 34756: mip =   9.800644876e+00 &gt;=   9.388645567e+00   4.2% (4355; 1728)
 ## + 37488: &gt;&gt;&gt;&gt;&gt;   9.798498277e+00 &gt;=   9.410482308e+00   4.0% (4641; 1913)
-## + 53471: mip =   9.798498277e+00 &gt;=   9.517715623e+00   2.9% (6202; 3219)
-## + 64215: mip =   9.798498277e+00 &gt;=   9.568431759e+00   2.3% (7273; 4301)
-## + 68775: mip =   9.798498277e+00 &gt;=   9.588747979e+00   2.1% (7721; 4824)
-## + 77303: mip =   9.798498277e+00 &gt;=   9.625250376e+00   1.8% (8569; 5966)
-## + 88358: mip =   9.798498277e+00 &gt;=   9.665323368e+00   1.4% (8943; 7975)
-## + 96997: mip =   9.798498277e+00 &gt;=   9.694233215e+00   1.1% (8548; 10327)
-## +104992: mip =   9.798498277e+00 &gt;=   9.718451801e+00   0.8% (7336; 13260)
-## +111142: mip =   9.798498277e+00 &gt;=   9.736368685e+00   0.6% (6013; 16299)
-## +116839: mip =   9.798498277e+00 &gt;=   9.751718309e+00   0.5% (4761; 19372)
-## Time used: 60.0 secs.  Memory used: 9.8 Mb.
-## +123995: mip =   9.798498277e+00 &gt;=   9.769959345e+00   0.3% (3125; 23658)
-## +131885: mip =   9.798498277e+00 &gt;=   9.788151425e+00   0.1% (1213; 29452)
+## + 53000: mip =   9.798498277e+00 &gt;=   9.515473733e+00   2.9% (6145; 3178)
+## + 68390: mip =   9.798498277e+00 &gt;=   9.587265411e+00   2.2% (7686; 4778)
+## + 83416: mip =   9.798498277e+00 &gt;=   9.648184943e+00   1.5% (8929; 6945)
+## + 96522: mip =   9.798498277e+00 &gt;=   9.692585168e+00   1.1% (8594; 10173)
+## +109159: mip =   9.798498277e+00 &gt;=   9.730572724e+00   0.7% (6449; 15282)
+## +124464: mip =   9.798498277e+00 &gt;=   9.771012122e+00   0.3% (3013; 23988)
 ## +136712: mip =   9.798498277e+00 &gt;=     tree is empty   0.0% (0; 35747)
 ## INTEGER OPTIMAL SOLUTION FOUND
 ## &lt;!SOLVER MSG&gt; ----</code></pre>
@@ -900,7 +895,7 @@ The impact of management is best viewed by comparing the above with the outcome 
 <div id="questions-7" class="section level4">
 <h4><strong>Questions</strong></h4>
 <p><strong>(10)</strong> How much did management reduce total pest density across space and time?</p>
-<p><strong>(11)</strong> Why a site that has high pest density at a given timestep not be selected for management when accounting for dispersal? Think about how sites may get reinvaded from neighbouring sites.</p>
+<p><strong>(11)</strong> Why might a site that has lower pest density at a given timestep be selected for management instead of one with higher pest density when accounting for dispersal? Think about how sites may get reinvaded from neighbouring sites.</p>
 <p><strong>(12)</strong> Describe which parameters you would change to improve the objective function further. If you are feeling brave, try changing these and resolving the model in the code chunk below!</p>
 </div>
 </div>
