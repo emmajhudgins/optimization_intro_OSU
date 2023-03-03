@@ -1,0 +1,632 @@
+---
+author: "Your Name"
+title: "Lab 7: Optimal Management"
+date: "`r format(Sys.Date(), tz = 'America/Los_Angeles')`"
+output:
+  html_document: default
+  word_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(here) # Start in R project directory
+library(dplyr) # Data wrangling
+library(viridis) # Color palettes for ggplot2
+library(knitr) # Including graphics
+library(ompr)
+library(ROI)
+library(ROI.plugin.glpk)
+library(ompr.roi)
+library(sp)
+```
+
+### **Learning Objectives**
+
+- Understand the limitations to descriptive models for prescriptive management
+- Differentiate objectives from constraints, and understand when variables are binary or continuous
+- Interpret a simple management optimization for different budgets and model parameters   
+- Modify model constraints and describe model behaviour change
+
+### **Instructions**
+
+There are a set of questions associated with each exercise below that you must complete either during class or on your own time. Record answers to the questions **within** the Markdown (`.Rmd`) file and record your name on line 2. Once you're done with the lab, knit the R markdown file as a Word document (`.docx`) within RStudio by clicking the `Knit` button found in the toolbar (look for a ball of yarn with a needle sticking out of it) and selecting `Knit to Word`. Ignore any warning messages that pop up in the Console during knitting. Submit the `.Rmd` **and** the `.docx` files on Canvas.
+
+We will be using many of the same packages you have used in previous labs. However, you'll need to install a few MIP packages using the `install.packages()` function.
+```{r}
+# "lapply" applies the install.packages() function to a vector of packages
+# pkgs_to_install <- c('ompr', 'ROI', 'ROI.plugin.glpk', 'ompr.roi')
+# lapply(pkgs_to_install, install.packages, character.only = TRUE)
+```
+
+### **Introduction**
+
+Much of ecological modelling focuses on getting the best estimate of the current situation. You have focused on this so far in this course, e.g. when you validated models using a confusion matrix. However, applied ecology often seeks to inform management, which requires going beyond describing a system and even forecasting risk. This is because getting a more accurate description of a system does not always lead to improved decisionmaking. Furthermore, an ecological model on its own does not tell you where to intervene to improve management outcomes. 
+
+The reason why modelling risk isn't sufficient may not be immediately intuitive, and you may be asking yourself *Why can't we just choose to manage the highest-risk sites within our budget?*. Indeed, many applied ecological papers provide a ranking of sites by relative risk and suggest that managers use these ranked lists to prioritize intervention. However, this is a heuristic that doesn't take **constraints** into account. For example, if you have a limited management budget of $50, you could have better outcomes by managing 2 less risky, but less costly sites (with benefits of 30 each) compared to the 1 riskiest site (with a benefit of 50). This type of problem is often referred to as the **Knapsack Problem** (see below)
+
+Thus, additional tools are needed to move from *descriptive* to *prescriptive* models. These help take into account which management options are available, the associated budget, and provide models for how management decisions impact important outcomes. These calculations can be especially complex in dynamic systems, where species grow and spread differently in the future as a result of differential management.
+
+To make decisions transparent surrounding management, we can specify a concrete **objective** for our problem. This objective can have any number of criteria as long as they can be translated into some quantitative outcome with weightings. As such, even though management optimization often examine cost savings, the objective does not need to be specified in terms of monetary cost.
+\
+\
+
+#### **(A) The knapsack problem - an example of binary decisionmaking**
+
+
+```{r, out.width = "650px", echo=FALSE, fig.align="left", fig.cap="the knapsack problem, from [here](https://www.codesdope.com/course/algorithms-knapsack-problem/)"}
+knitr::include_graphics(here("Labs", "Lab7_optimization", "images", "knap1.png"))
+```
+
+Suppose you are trying to pack for a hiking trip and have the choice among different items to pack. Each item has a different value for you on your trip and a weight. Your bag has a limitation of the maximum weight you can put in it. So, you need to choose items to put in your bag such that you maximize the value of the items in your bag for your trip.
+
+```{r, out.width = "650px", echo=FALSE, fig.align="left", fig.cap="Quantifying the possibile items"}
+knitr::include_graphics(here("Labs", "Lab7_optimization", "images", "knap2.png"))
+```
+
+This problem is commonly known as the knapsack or the rucksack problem. There are different kinds of items $i$ and each item $i$ has a weight ($w_i$) and value ($v_i$) associated with it. 
+
+$x_i$ is the binary decision variable representing whether we chose item $i$. Importantly, the bag has a maximum weight ($W$)
+
+So, our main task is to maximize the value i.e., 
+\
+\
+ maximize     $\sum_{i=1}^nx_iv_i$\
+ \
+ subject to   $\sum_ix_iw_i<=W$\
+ \
+             $x_i \in \{0,1\}$,      $i=1,2,...n$
+\
+\
+
+In other words, the summation of the number of items taken * their value, such that the weight of all the items is less than the maximum weight.
+\
+\
+
+#### **(B) MIP models in R**
+*adapted from [this tutorial](https://www.r-orms.org/mixed-integer-linear-programming/packages/modelling-milp/)*
+\
+\
+
+There are many languages and packages that can be used to implement Mixed Integer Programs. Today, we will use a slower, but more user-friendly package called `ompr`.
+
+You can think of a MIP Model as a big constraint maxtrix and a set of vectors. But you can also think of it as a set of decision variables, an objective function and a number of constraints as equations/inequalities.  `ompr` implements the latter approach.
+
+This is the `ompr` equivalent of the Knapsack problem:
+
+```{r}
+n <- 10; W <- 2
+v <- runif(n);w <- runif(n)
+model <- MIPModel() %>% 
+  add_variable(x[i], i = 1:n, type = "binary") %>% 
+  set_objective(sum_expr(v[i] * x[i], i = 1:n)) %>% 
+  add_constraint(sum_expr(w[i] * x[i], i = 1:n) <= W)
+```
+
+This is a really readable format that allows you to go pretty directly from equations to code. `ompr` will do the heavy lifting by transforming everything into matrices/vectors and passing it to your favorite solver. We will use open source tools for convenience.
+
+**Pipes**
+
+As you've seen before in `dplyr`-based wrangling, the`ompr` package is designed to work with pipes `%>%`. You always start with an empty model and add components to it.
+
+```{r}
+MIPModel() %>% 
+  add_variable(x) %>% 
+  set_objective(x) %>% 
+  add_constraint(x <= 1)
+```
+
+**Variable types**
+
+Variables can be of type continuous, integer or binary.
+
+```{r}
+MIPModel() %>% 
+  add_variable(x, type = "integer") %>% 
+  add_variable(y, type = "continuous") %>% 
+  add_variable(z, type = "binary")
+```
+
+**Variable bounds**
+
+Variables can have lower and upper bounds.
+```{r}
+MIPModel() %>% 
+  add_variable(x, lb = 10) %>% 
+  add_variable(y, lb = 5, ub = 10)
+```
+
+**Indexed variables**
+
+Often, when you develop a complex model you work with indexed variables (vectors or matrices).
+
+```{r}
+MIPModel() %>% 
+  add_variable(x[i], i = 1:10) %>%  # creates 10 decision variables
+  set_objective(x[5]) %>% 
+  add_constraint(x[5] <= 10)
+```
+
+**Summation over variables**
+
+If you have indexed variables, then you often want to sum over a subset of variables.The following code creates a model with three decision variables $x_1, x_2, x_3$, an objective function, *maximize* $\sum_ix$, and one constraint $\sum_{i=1}^{3}x_i<=10$ 
+
+```{r}
+MIPModel() %>% 
+  add_variable(x[i], i = 1:3) %>% 
+  set_objective(sum_expr(x[i], i = 1:3)) %>% 
+  add_constraint(sum_expr(x[i], i = 1:3) <= 10)
+```
+
+NOTE: You can reuse any variable/object defined in your R environment within the MIP Model.
+
+Once you have a model, you pass it to a solver and get back a solutions. By default, the solver maximizes your chosen objective, but it can also minimize it. The main interface to extract variable values from a solution is the function `get_solution`. It returns a `data.frame` for indexed variables and thus makes it easy to subsequently use the values.
+\
+\
+
+### **Exercise 1: The Knapsack problem in R with** `ompr`
+
+Here, we are using simulated random data to create 10 objects with various weights to examine the behaviour of one of the simplest binary decision problems.
+\
+
+#### **Step 1: set up and run the model**
+```{r}
+set.seed(1) # set a defined random seed for replicability of solutions
+n <- 10 # the number of possible items to choose from
+weights <- rpois(n, 5) # create some random data for knapsack weights by sampling from the Poisson distribution
+benefits<-runif(n, 0, 10) # create some random data for the benefit associated with each of the objects
+cbind(weights,benefits) #print weights an values
+max_weight<-30 # fix some total budget
+result <- MIPModel() %>% 
+  add_variable(x[i], i = 1:n, type = "binary") %>%  # define decision variable x as binary
+    add_constraint(sum_expr(weights[i]*x[i], i=1:n)<=max_weight) %>%  # define decision variable x as binary
+  set_objective(sum_expr(benefits[i] * x[i], i = 1:n)) %>% #specify your objective
+  solve_model(with_ROI("glpk", verbose = TRUE))
+```
+
+
+#### **Step 2: examine solutions**
+
+This code will show you which items were chosen (i.e. which decision variables set to a value of 1 by the model)
+```{r}
+get_solution(result, x[i]) %>% 
+  dplyr::filter(value == 1) #show which of the decision variables were set to 1 (which objects were placed in the knapsack)
+```
+
+
+#### **Questions**
+
+**(1)** Compare the items selected by the model with what would have been selected by prioritizing items by their value up until your budget. Why do these solutions differ?
+
+**(2)** Alter the code to increase your budget to 50. How do the new objective value and number of items selected change?
+
+```{r}
+max_weight2<-50 # increase the total budget
+
+### ALTER THE CODE BELOW TO REPLACE max_weight with max_weight2
+result2 <- MIPModel() %>% 
+  add_variable(x[i], i = 1:n, type = "binary") %>%  # define decision variable x as binary
+    add_constraint(sum_expr(weights[i]*x[i], i=1:n)<=max_weight) %>%  # define decision variable x as binary
+  set_objective(sum_expr(benefits[i] * x[i], i = 1:n)) %>% #specify your objective
+  solve_model(with_ROI("glpk", verbose = TRUE))
+
+### PRINT NEW SOLUTIONS
+
+get_solution(result2, x[i]) %>% 
+  dplyr::filter(value == 1) #show which of the decision variables were set to 1 (which objects were placed in the knapsack)
+
+```
+
+\
+\
+
+### **Exercise 2. Re-conceptualizing as a management problem**
+
+
+```{r, out.width = "650px", echo=FALSE, fig.align="left", fig.cap="An example study area composed of planning units"}
+knitr::include_graphics(here("Labs", "Lab7_optimization", "images", "grid.png"))
+```
+
+\
+\
+The management of invasive species, when constrainted by a budget, can be conceptualized as an extension of the knapsack problem, where the knapsack is one **planning unit** of a spatial decision problem. Instead of 'weights' associated with items added to the knapsack, we can think of the **costs** associated with each management intervention we could take in the planning unit. The 'value' that each of these decisions adds is dependent on the **efficiency** of the intervention at impacting our **objective function**. Some formulation of an efficiency equation is typically added as a constraint to show how management interventions increase benefits or reduce damages at a site. Just like before, the best decision depends on the **budget constraint**. 
+
+In a simple case with a small number of planning units, this problem can be solved quite quickly by hand. However, in general, the problem scales in complexity as a power relationship to the number of planning units in the **study area** due to the rules of combinatorics. This is where solvers can really help.
+\
+\
+
+#### **Step 1: fit a management model in a grid with 9 sites**
+
+Let's reimagine the knapsack problm as a 3x3 grid of planning units. Each of these can be thought of as a separate 'knapsack' (though we'll talk later about how dispersal makes this assumption invalid). 
+
+Let's first imagine we have a fixed budget of \$50. While we will be focusing on a fixed budget approach here, note that there are also alternative approaches, like maximizing the ratio of benefits to costs, or maximizing the difference between benefits and costs, and these can be implemented just as easily in MIP. We can choose to apply an insecticide treatment to each of the cells that costs \$10, or we can perform an aerial spray on the cell that costs $20. The first of these interventions causes 50% reduction in the pest population at each cell, whereas the second causes a 90% reduction in each cell. 
+
+In other words, 
+$B=50$ total budget
+\
+$c_t = 10$ cost of insecticide treatment
+\
+$\epsilon_t = 0.5$ efficiency of insecticide treatment
+\
+$c_s = 20$ cost of insecticide treatment
+\
+$\epsilon_s = 0.9$ efficiency of aerial spray
+
+Let's also assume that we previous collected data on (or had modelled) the relative abundance of the pest across sites.
+
+$p0 = (p0_{i=1}, p0_{i=2},...p0_{i=n})$\
+
+Where $p0_i$ represents a continuous pest relative abundance between 0 and 1 (you can assume 1 is the carrying capacity) in cell $i$ before management
+
+One possible objective function for this model is the following:
+
+$minimize$   $\sum_ip_i*h_i$\
+
+Where $p_i$ represents a continuous pest relative abundance between 0 and 1 (you can assume 1 is the carrying capacity) in cell $i$ after management, and $h_i$ is the host abundance in cell $i$.
+\
+\
+
+#### **Questions**
+**(3)** Describe the objective function in your own terms. 
+\
+\
+Our model is still missing a few things. The first is a way of incorporating the impact of management into the objective function. Here is one way of modelling the impact of a management intervention.
+
+$p_i=p0_i(1-t_i\epsilon_r-s_i\epsilon_t)$\
+$t_i \in \{0,1\}$\
+$s_i \in \{0,1\}$\
+$t_i+s_i\leq1$   $\forall i \in n$\
+
+This assumes that in the absence of management, each grid cell maintains its previous pest density, whereas in the presence of management, the pest density is reduced by the efficiency associated with that action type. $t_i$ and $s_i$ are binary decision variables that represent whether an action of that type was taken in site $i$. The final line makes sure that a maximum of one action is taken in a site (otherwise the density could go negative if both actions were taken. There are ways of compounding multiple management types using nonlinear formulations but that's beyond the scope of this lab).
+
+The final piece of the model is specifying the maximum budget in terms of management decisions in their costs.
+
+$\sum_is_ic_s+t_ic_t<=B$\
+\
+Since $s$ and $t$ are vectors of binary variables, this formulation ensures that the budget is only used when management of that particular type has been selected at a particular site (i.e. set to 1)
+\
+\
+
+#### **Questions** 
+**(4)** Provide a written description of the constraints in this model. (Hint: See the code below, and there are 2 main constraints).
+\
+\
+
+Start by setting all the constants in your model
+```{r}
+n <- 9 # the number of planning units
+h <- rpois(n, 50) # create some random data for the number of hosts in each site
+p0<-runif(n, 0, 1) # create some random data for the initial pest density in each site
+B<- 50 # fix some total budget
+c_t<- 10 # cost of insecticide
+c_s <-20 # cost of aerial spray
+e_t<-0.5 # efficiency of insecticide
+e_s<-0.9 # efficiency of aerial spray
+```
+
+Let's create a plot to help you visualize the distribution of hosts and pests prior to management.
+
+```{r}
+coords<-cbind(x=rep(c(1,2,3), 3), y=rep(c(1,2,3), each=3)) # centroids of a 3x3 grid
+points<-SpatialPoints(coords) #convert to spatial points format
+grid<-SpatialGrid(points2grid(points)) #convert to spatial grid
+plot(grid) #empty grid
+
+hostgrid<-SpatialGridDataFrame(grid, data.frame(h))
+plot(hostgrid, col=viridis(9), main="Host Population") # host density plot
+pestgrid<-SpatialGridDataFrame(grid, data.frame(p0))
+plot(pestgrid, col=viridis(9), breaks=seq(0,1,length.out=10), main="Pest Density") # pest density plot
+
+```
+
+#### **Questions** 
+
+**(5)** If you had no additional information, what would you guess the optimal management strategy would be based on these maps? (There's no need to be in line with what the optimizer chooses here, just justify your choice).
+
+**(6)** In what ways is this pest model a simplification of the real world? What could be done to improve its realism? Give particular attention to the use of constants in this formulation
+
+Now we can specify the model and run it!
+
+```{r}
+pest_mod <- MIPModel() %>% 
+  add_variable(s[i], i = 1:n, type = "binary") %>%  # define decision variable s as binary
+  add_variable(t[i], i = 1:n, type = "binary") %>%  # define decision variable t as binary
+  add_variable(p[i], i = 1:n, type = "continuous", lb=0, ub=1) %>%  # define the pest density variable as a continuous value between 0 and 1
+  add_constraint(p[i]==p0[i]*(1-s[i]*e_s-t[i]*e_t), i=1:n) %>%  # effect of management on pest density
+  add_constraint(s[i]+t[i]<=1, i=1:n) %>%  # maximum of one management type per cell
+  add_constraint(sum_expr(c_s*s[i]+c_t*t[i], i=1:n)<=B) %>%  # total budget
+  set_objective(sum_expr(h[i]*p[i], i = 1:n),sense = 'min') %>% #objective function, notice it is now set to minimize this expression
+  solve_model(with_ROI("glpk", verbose = TRUE))
+```
+
+
+#### **Step 2: examine pest model solutions**
+
+This code will show you which items were chosen (i.e. which decision variables were set to a value of 1 by the model)
+```{r}
+(t_sites<-get_solution(pest_mod, t[i]) %>% 
+  dplyr::filter(value == 1)) #show which of the sites were selected for insecticide treatment
+(s_sites<-get_solution(pest_mod, s[i]) %>% 
+  dplyr::filter(value == 1)) #show which of the sites were selected for aerial spraying
+
+(pest_den<-get_solution(pest_mod, p[i])$value) #pest density after management in each cell
+
+objective_value(pest_mod) # examine the objective value at the optimum
+```
+
+Plot these values on the grid of pest density and the grid of host density, and then plot the pest density after management in the optimal solution
+```{r}
+plot(hostgrid, col=viridis(9), main="Host Population") # host density plot
+points(x=coordinates(grid)[t_sites$i,1], y=coordinates(grid)[t_sites$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites$i,1], y=coordinates(grid)[s_sites$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+
+pestgrid<-SpatialGridDataFrame(grid, data.frame(p0))
+plot(pestgrid, col=viridis(9), main="Pest Density Before Management", breaks=seq(0,1,length.out=10)) # pest density plot before management
+points(x=coordinates(grid)[t_sites$i,1], y=coordinates(grid)[t_sites$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites$i,1], y=coordinates(grid)[s_sites$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+
+postgrid<-SpatialGridDataFrame(grid, data.frame(pest_den))
+
+plot(postgrid, col=viridis(9), main="Pest Density After Management",  breaks=seq(0,1,length.out=10)) # pest density after management
+points(x=coordinates(grid)[t_sites$i,1], y=coordinates(grid)[t_sites$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites$i,1], y=coordinates(grid)[s_sites$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+
+
+exposegrid<-SpatialGridDataFrame(grid, data.frame(p0*h))
+
+plot(exposegrid, col=viridis(9), main="Exposed Hosts Before Management",  breaks=seq(0,max(h),length.out=10)) # pest density after management
+points(x=coordinates(grid)[t_sites$i,1], y=coordinates(grid)[t_sites$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites$i,1], y=coordinates(grid)[s_sites$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+
+exposepostgrid<-SpatialGridDataFrame(grid, data.frame(pest_den*h))
+
+plot(exposepostgrid, col=viridis(9), main="Exposed Hosts After Management",  breaks=seq(0,max(h),length.out=10)) # pest density after management
+points(x=coordinates(grid)[t_sites$i,1], y=coordinates(grid)[t_sites$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites$i,1], y=coordinates(grid)[s_sites$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+```
+
+
+#### **Questions**
+
+**(7)** How do these results compare to your predictions? If they differ, why do you think they do?
+
+**(8)** In the code chunk below, rerun this model with a budget of 100, reducing the efficiency of insecticide to 25%. (HINT: you can copy and paste the entire model code as is, the only thing you need to change are the constants you set earlier, `B` and `e_t`)
+
+```{r}
+B2=B # modify the righthand side of this line to your new budget instead of B
+e_t2=e_t # modify the righthand side of this line to your new efficiency of insecticide instead of e_t
+
+pest_mod2 <- MIPModel() %>% 
+  add_variable(s[i], i = 1:n, type = "binary") %>%  # define decision variable s as binary
+  add_variable(t[i], i = 1:n, type = "binary") %>%  # define decision variable t as binary
+  add_variable(p[i], i = 1:n, type = "continuous", lb=0, ub=1) %>%  # define the pest density variable as a continuous value between 0 and 1
+  add_constraint(p[i]==p0[i]*(1-s[i]*e_s-t[i]*e_t2), i=1:n) %>%  # effect of management on pest density
+  add_constraint(s[i]+t[i]<=1, i=1:n) %>%  # maximum of one management type per cell
+  add_constraint(sum_expr(c_s*s[i]+c_t*t[i], i=1:n)<=B2) %>%  # total budget
+  set_objective(sum_expr(h[i]*p[i], i = 1:n),sense = 'min') %>% #objective function, notice it is now set to minimize this expression
+  solve_model(with_ROI("glpk", verbose = TRUE))
+
+```
+
+
+Examine the solutions:
+```{r}
+(t_sites2<-get_solution(pest_mod2, t[i]) %>% 
+  dplyr::filter(value == 1)) #show which of the sites were selected for insecticide treatment
+(s_sites2<-get_solution(pest_mod2, s[i]) %>% 
+  dplyr::filter(value == 1)) #show which of the sites were selected for aerial spraying
+
+(pest_den2<-get_solution(pest_mod2, p[i])$value) #pest density after management in each cell
+
+objective_value(pest_mod2) # examine the objective value at the optimum
+
+plot(hostgrid, col=viridis(9), main="Host Density") # host density plot
+points(x=coordinates(grid)[t_sites2$i,1], y=coordinates(grid)[t_sites2$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites2$i,1], y=coordinates(grid)[s_sites2$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+
+pestgrid<-SpatialGridDataFrame(grid, data.frame(p0))
+plot(pestgrid, col=viridis(9), main="Pest Density",  breaks=seq(0,1,length.out=10)) # pest density plot
+points(x=coordinates(grid)[t_sites2$i,1], y=coordinates(grid)[t_sites2$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites2$i,1], y=coordinates(grid)[s_sites2$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+
+exposegrid<-SpatialGridDataFrame(grid, data.frame(p0*h))
+
+plot(exposegrid, col=viridis(9), main="Exposed Hosts Before Management",  breaks=seq(0,max(h),length.out=10)) # pest density after management
+points(x=coordinates(grid)[t_sites2$i,1], y=coordinates(grid)[t_sites2$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites2$i,1], y=coordinates(grid)[s_sites2$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+
+exposepostgrid<-SpatialGridDataFrame(grid, data.frame(pest_den2*h))
+
+plot(exposepostgrid, col=viridis(9), main="Exposed Hosts After Management",  breaks=seq(0,max(h),length.out=10)) # pest density after management
+points(x=coordinates(grid)[t_sites2$i,1], y=coordinates(grid)[t_sites2$i,2], bg="white", pch=21, cex=3)
+points(x=coordinates(grid)[s_sites2$i,1], y=coordinates(grid)[s_sites2$i,2],  bg='darkgrey', pch=21, cex=3)
+legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'darkgrey'))
+```
+
+\
+\
+
+#### **Questions**
+**(9)** Describe the main changes to the solution that occurred, including the objective value, choice of management type and spatial arrangement of management. Explain why you think these changes occurred.
+
+### **Exercise 3: Add realism **
+
+At this stage, the model specification is already quite complex, but we haven't accounted for much of what makes invasion management problems difficult! Namely, we need to look at the role of temporal and spatial non-independence. That is, management at one time and place has often-unpredictable feedbacks on every other location across time.
+
+In invasions, this is not just due to population recovery through growth, but also because of dispersal. Both of these processes make the specification of linear problems quite difficult (as you saw in lecture)
+
+Below is a model on a 4x4 grid where the pest population starts off from a point source and spreads to neighbouring cells at each timestep. Pest populations grow by a constant rate at each timestep (exponential growth). Even this very crude representation requires some interesting representations.
+
+Let's assume, as before:
+$B=60$ total budget\
+$p0 = (p0_{i=1}, p0_{i=2},...p0_{i=n})$\
+\
+But simplify to one type of management:\
+$c = 15$,   cost of management\
+$\epsilon=0.5$,  efficiency of management\
+\
+
+And add the following:
+
+minimize   $\sum_{t=1}^5\sum_ip_i$,  Disregard hosts for simplicity\
+\
+subject to $p_{it}=(0.4p_{it-1}(1-x_i\epsilon_t)+\sum_j{0.1A_{ji}p_{jt-1}(1-x_j\epsilon_t)})r$\
+           $p_{i1} = p0_i$,   the initial conditions of pest density\
+           $\sum_it_ic_t<=B$,  the budget constraint\
+           $x_i \in \{0,1\}$,  the decision to manage at each site\
+          $A_{ij} \in {0,1}$,  an adjacency matrix (1s whenever two cells are adjacent to one another and 0s otherwise)\
+\
+This model assumes that at each timestep, a cell disperses 10% of its own propagules to each of its 6 immediate neighbour cells, such that 40% of the population remains. This new density then grows by the growth rate. Let's assume that cells along edges still lose propagules but that they die off beyond the grid.   
+
+This model may look mathematically simple, but it is technically a **nonlinear** problem that cannot be solved by `ompr` without several additional linearization equations. This is because the first line of the constraint section can be rewritten as: 
+\
+\
+        $p_{it}=0.4p_{it-1}r-0.4\epsilon_tr(x_ip_{it-1})+r\sum_j{0.1A_{ji}p_{jt-1}-0.1A_{jt}\epsilon_t(x_ip_{jt-1}))}$
+\
+\
+The issue here is that in the expression $x_{it}p_{it-1}$, two variables (not constants) are being multiplied by one another. This is what it means for an MIP to be nonlinear. One of these, $x_{it}$ is binary, and the other p_{it-1} is continuous. Thus, we must convert this expression into a non-multiplicative formulation using a series of inequalities.
+\
+\
+        assume $v_{i,t}=x_{it}p_{it-1}$\
+        \
+        $v_{it}<=x_{it}M$     When the site is not managed ($x_{it}=0$), this term is 0, when the site is managed ($x_{it}=1$), this term is smaller than some arbitrarily big number M (this is called a big-M constraint)\
+        $v_{it}<=p_{it-1}$    $v_{it}$ is never greater than $p_{it-1}$\
+        $v_{it}>=p_{it-1}-M(1-x_{it})$    This allows $v_it$ to be set to zero when $x_{it}$ is zero, and for $v_{it}$ to be exactly $p_{it-1} when $x_{it}$ is 1\
+        \
+Try to convince yourself that this set of 3 inequalities actually ends up being equivalent to a multiplication of a binary and continuous variable by working through the different possible cases
+
+##### **Questions**
+**(8)** What is still lacking from the realism of this model?
+\
+\
+
+#### **Step 1: Code up this more realistic model**
+Here is the code for our 4x4 model. You can see how its gotten much more complex with minimal additional realism!
+\
+Let's start by setting our constants and visualizing our starting conditions. I've chosen to implement pest spread as a travelling wave moving northward from the bottom of the grid.
+```{r}
+n <- 4*4 # the number of planning units
+p0<-rep(0,n)
+p0[13:16]<-runif(4, 0.2, 0.8) # create some random data for the initial pest density a few source locations
+B<- 60 # fix some total budget
+c<- 15 # cost of management
+e<-0.5 # efficiency of management
+r<-2 # growth rate
+M<-10 # specify some large number you dont expect pest density will get to during your time horizon for your big-M constraint
+
+# Calculating the adjacency matrix is a bit more complicated
+coords<-cbind(x=rep(c(1:sqrt(n)), sqrt(n)), y=rep(c(1:sqrt(n)), each=sqrt(n))) # centroids of a 6x6 grid
+points<-SpatialPoints(coords) #convert to spatial points format
+grid<-SpatialGrid(points2grid(points)) #convert to spatial grid
+plot(grid) #empty grid
+A<-matrix(0, nrow=n, ncol=n) #initialize adjacency matrix 
+distance<-as.matrix(dist(coordinates(grid))) # calculate distance from all cells to all cells
+A[distance==1]<-1 # add 1s to neighbours (1 cell-length away)
+
+pestgrid<-SpatialGridDataFrame(grid, data.frame(p0))
+plot(pestgrid, col=viridis(9), breaks=seq(0,1,length.out=10), main="Initial Pest Density") # pest density plot
+```
+
+
+Now you can specify the model:
+```{r}
+pest_mod3 <- MIPModel() %>%
+  add_variable(x[i,t], i = 1:n, t=1:5,type = "binary") %>%  # define decision variable x as binary
+  add_variable(p[i,t], i = 1:n, t=1:5,type = "continuous", lb=0, ub=M) %>%  # define the pest density variable as a continuous value between 0 and 1
+ add_variable(v[i,t], i = 1:n, t=1:5,type = "continuous", lb=0, ub=M) %>%  # define your linearized variable v similar to p
+  add_constraint(p[i,t]>=0.4*p[i,t-1]*r-0.4*e*r*v[i,t]+r*sum_expr(0.1*A[j,i]*p[j,t-1]-0.1*A[j,i]*e*v[j,t], j=1:n), i=1:n, t=2:5) %>%  # effect of management on pest density
+  add_constraint(p[i,t]==p0[i], i=1:n, t=1) %>%  # initial pest density
+  add_constraint(v[i,t]<=M*x[i,t], i=1:n, t=2:5) %>%  #linearization
+  add_constraint(v[i,t]<=p[i,t], i=1:n, t=2:5) %>%
+  add_constraint(v[i,t]>=p[i,t]-M*(1-x[i,t]), i=1:n, t=2:5) %>%
+  add_constraint(sum_expr(c*x[i,t], i=1:n)<=B, t=1:5) %>%  # total budget
+  set_objective(sum_expr(p[i,t], i = 1:n, t=1:5),sense = 'min') %>% #objective function, notice it is now set to minimize this expression
+  solve_model(with_ROI("glpk", verbose = TRUE))
+```
+
+Notice it takes more time? You can watch the solution get closer to optimality over time using the solver's branch-and-bound algorithm.
+
+Finally, let's visualize our optimal solutions!
+```{r}
+(sites<-get_solution(pest_mod3, x[i,t]) %>% 
+  dplyr::filter(value == 1)) #show which of the sites were selected for insecticide treatment
+
+(pest_den3<-matrix(get_solution(pest_mod3, p[i,t])$value, nrow=n, ncol=5)) #pest density after management in each cell
+
+objective_value(pest_mod3) # examine the objective value at the optimum
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,1])), col=viridis(9), main="Pest density time 1",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+points(x=coordinates(grid)[sites$i[which(sites$t==1)],1], y=coordinates(grid)[sites$i[which(sites$t==1)],2], bg="white", pch=21, cex=3)
+legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,2])), col=viridis(9), main="Pest density time 2",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+points(x=coordinates(grid)[sites$i[which(sites$t==2)],1], y=coordinates(grid)[sites$i[which(sites$t==2)],2], bg="white", pch=21, cex=3)
+legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,3])), col=viridis(9), main="Pest density time 3",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+points(x=coordinates(grid)[sites$i[which(sites$t==3)],1], y=coordinates(grid)[sites$i[which(sites$t==3)],2], bg="white", pch=21, cex=3)
+legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,4])), col=viridis(9), main="Pest density time 4",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+points(x=coordinates(grid)[sites$i[which(sites$t==4)],1], y=coordinates(grid)[sites$i[which(sites$t==4)],2], bg="white", pch=21, cex=3)
+legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,5])), col=viridis(9), main="Pest density time 5",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+points(x=coordinates(grid)[sites$i[which(sites$t==5)],1], y=coordinates(grid)[sites$i[which(sites$t==5)],2], bg="white", pch=21, cex=3)
+legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
+
+```
+\
+\
+The impact of management is best viewed by comparing the above with the outcome of an optimization where the management budget forced to 0.
+
+```{r}
+pest_mod_nobudget <- MIPModel() %>%
+  add_variable(x[i,t], i = 1:n, t=1:5,type = "binary") %>%  # define decision variable x as binary
+  add_variable(p[i,t], i = 1:n, t=1:5,type = "continuous", lb=0, ub=M) %>%  # define the pest density variable as a continuous value between 0 and 1
+ add_variable(v[i,t], i = 1:n, t=1:5,type = "continuous", lb=0, ub=M) %>%  # define your linearized variable v similar to p
+  add_constraint(p[i,t]>=0.4*p[i,t-1]*r-0.4*e*r*v[i,t]+r*sum_expr(0.1*A[j,i]*p[j,t-1]-0.1*A[j,i]*e*v[j,t], j=1:n), i=1:n, t=2:5) %>%  # effect of management on pest density
+  add_constraint(p[i,t]==p0[i], i=1:n, t=1) %>%  # initial pest density
+  add_constraint(v[i,t]<=M*x[i,t], i=1:n, t=2:5) %>%  #linearization
+  add_constraint(v[i,t]<=p[i,t], i=1:n, t=2:5) %>%
+  add_constraint(v[i,t]>=p[i,t]-M*(1-x[i,t]), i=1:n, t=2:5) %>%
+  add_constraint(sum_expr(c*x[i,t], i=1:n)<=0, t=1:5) %>%  # total budget set to 0
+  set_objective(sum_expr(p[i,t], i = 1:n, t=1:5),sense = 'min') %>% #objective function, notice it is now set to minimize this expression
+  solve_model(with_ROI("glpk", verbose = TRUE))
+
+(sites<-get_solution(pest_mod_nobudget, x[i,t]) %>% 
+  dplyr::filter(value == 1)) #show which of the sites were selected for insecticide treatment
+
+(pest_den_nobudget<-matrix(get_solution(pest_mod_nobudget, p[i,t])$value, nrow=n, ncol=5)) #pest density after management in each cell
+
+objective_value(pest_mod_nobudget) # examine the objective value without management
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,1])), col=viridis(9), main="Pest density time 1",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,2])), col=viridis(9), main="Pest density time 2",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,3])), col=viridis(9), main="Pest density time 3",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,4])), col=viridis(9), main="Pest density time 4",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,5])), col=viridis(9), main="Pest density time 5",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+
+```
+
+#### **Questions**
+**(10)** How much did management reduce total pest density across space and time?
+
+**(11)** Why might a site that has lower pest density at a given timestep be selected for management instead of one with higher pest density when accounting for dispersal? Think about how sites may get reinvaded from neighbouring sites.
+
+**(12)** Describe which parameters you would change to improve the objective function further. If you are feeling brave, try changing these and resolving the model in the code chunk below!
+
+```{r}
+```
