@@ -32,7 +32,7 @@ library(sp)
 
 There are a set of questions associated with each exercise below that you must complete either during class or on your own time. Record answers to the questions **within** the Markdown (`.Rmd`) file and record your name on line 2. Once you're done with the lab, knit the R markdown file as a Word document (`.docx`) within RStudio by clicking the `Knit` button found in the toolbar (look for a ball of yarn with a needle sticking out of it) and selecting `Knit to Word`. Ignore any warning messages that pop up in the Console during knitting. Submit the `.Rmd` **and** the `.docx` files on Canvas.
 
-We will be using many of the same packages you have used in previous labs. However, you'll need to install a few MIP packages using the `install.packages()` function.
+We will be using many of the same packages you have used in previous labs. However, you'll need to install a few Mixed Integer Programming-based Optimization (MIP) packages using the `install.packages()` function.
 ```{r}
 # "lapply" applies the install.packages() function to a vector of packages
 # pkgs_to_install <- c('ompr', 'ROI', 'ROI.plugin.glpk', 'ompr.roi')
@@ -79,18 +79,18 @@ So, our main task is to maximize the value i.e.,
 \
 \
 
-In other words, the summation of the number of items taken * their value, such that the weight of all the items is less than the maximum weight.
+In other words, the summation of whether each item was included * their value, such that the weight of all the items included is less than the maximum weight.
 \
 \
 
-#### **(B) MIP models in R**
+#### **(B) Mixed Integer Programming models in R**
 *adapted from [this tutorial](https://www.r-orms.org/mixed-integer-linear-programming/packages/modelling-milp/)*
 \
 \
 
-There are many languages and packages that can be used to implement Mixed Integer Programs. Today, we will use a slower, but more user-friendly package called `ompr`.
+There are many languages and packages that can be used to implement Mixed Integer Programs (MIPs:decision problems with a combination of integer decision variables and continuous objectives and/or constraints). Today, we will use a slower, but more user-friendly package called `ompr`.
 
-You can think of a MIP Model as a big constraint maxtrix and a set of vectors. But you can also think of it as a set of decision variables, an objective function and a number of constraints as equations/inequalities.  `ompr` implements the latter approach.
+As you saw in lecture, and MIP formulation involves specifying decision variables, an objective function and a number of constraints as equations/inequalities.  `ompr` takes your mathematical formulation and transforms it behind the scenes to a big constraint maxtrix and a set of vectors to solve it. 
 
 This is the `ompr` equivalent of the Knapsack problem:
 
@@ -160,7 +160,7 @@ MIPModel() %>%
 
 NOTE: You can reuse any variable/object defined in your R environment within the MIP Model.
 
-Once you have a model, you pass it to a solver and get back a solutions. By default, the solver maximizes your chosen objective, but it can also minimize it. The main interface to extract variable values from a solution is the function `get_solution`. It returns a `data.frame` for indexed variables and thus makes it easy to subsequently use the values.
+Once you have a model, you pass it to a solver and get back a solution. By default, the solver maximizes your chosen objective, but it can also minimize it. The main interface to extract variable values from a solution is the function `get_solution`. It returns a `data.frame` for indexed variables and thus makes it easy to subsequently use the values.
 \
 \
 
@@ -187,7 +187,7 @@ result <- MIPModel() %>%
 
 #### **Step 2: examine solutions**
 
-This code will show you which items were chosen (i.e. which decision variables set to a value of 1 by the model)
+This code will show you which items were chosen (i.e. which decision variables were set to a value of 1 by the model)
 ```{r}
 get_solution(result, x[i]) %>% 
   dplyr::filter(value == 1) #show which of the decision variables were set to 1 (which objects were placed in the knapsack)
@@ -239,7 +239,7 @@ In a simple case with a small number of planning units, this problem can be solv
 
 Let's reimagine the knapsack problem as a 3x3 grid of planning units. Each of these can be thought of as a separate 'knapsack' (though we'll talk later about how dispersal makes this assumption invalid). 
 
-Let's first imagine we have a fixed budget of \$50. While we will be focusing on a fixed budget approach here, note that there are also alternative approaches, like maximizing the ratio of benefits to costs, or maximizing the difference between benefits and costs, and these can be implemented just as easily in MIP. We can choose to apply an insecticide treatment to each of the cells that costs \$10, or we can perform an aerial spray on the cell that costs $20. The first of these interventions causes 50% reduction in the pest population at each cell, whereas the second causes a 90% reduction in each cell. 
+Let's first imagine we have a fixed budget of \$50. While we will be focusing on a fixed budget approach here, note that there are also alternative approaches, like maximizing the ratio of benefits to costs, or maximizing the difference between benefits and costs, and these can be implemented just as easily as mixed integer programs. Here, assume we can choose to apply an insecticide treatment to each of the cells that costs \$10, or we can perform an aerial spray on the cell that costs $20. The first of these interventions causes 50% reduction in the pest population at each cell, whereas the second causes a 90% reduction in each cell. 
 
 In other words, 
 $B=50$ total budget
@@ -504,7 +504,7 @@ The issue here is that in the expression $x_{it}p_{it-1}$, two variables (not co
 Try to convince yourself that this set of 3 inequalities actually ends up being equivalent to a multiplication of a binary and continuous variable by working through the different possible cases
 
 ##### **Questions**
-**(8)** What is still lacking from the realism of this model?
+**(8)** (optional if time) What is still lacking from the realism of this model?
 \
 \
 
@@ -626,7 +626,9 @@ plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,5])), col=viridis(
 
 **(11)** Why might a site that has lower pest density at a given timestep be selected for management instead of one with higher pest density when accounting for dispersal? Think about how sites may get reinvaded from neighbouring sites.
 
-**(12)** Describe which parameters you would change to improve the objective function further. If you are feeling brave, try changing these and resolving the model in the code chunk below!
+**(12)** (optional if time) Describe which parameters you would change to improve the objective function further. If you are feeling brave, try changing these and resolving the model in the code chunk below!
 
 ```{r}
 ```
+
+**(13)** Discuss your overall results from this lab exercise as well as some potential applications of management optimization models.

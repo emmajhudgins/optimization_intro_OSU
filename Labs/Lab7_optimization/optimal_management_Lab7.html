@@ -182,7 +182,7 @@ pre code {
 <div id="instructions" class="section level3">
 <h3><strong>Instructions</strong></h3>
 <p>There are a set of questions associated with each exercise below that you must complete either during class or on your own time. Record answers to the questions <strong>within</strong> the Markdown (<code>.Rmd</code>) file and record your name on line 2. Once you’re done with the lab, knit the R markdown file as a Word document (<code>.docx</code>) within RStudio by clicking the <code>Knit</code> button found in the toolbar (look for a ball of yarn with a needle sticking out of it) and selecting <code>Knit to Word</code>. Ignore any warning messages that pop up in the Console during knitting. Submit the <code>.Rmd</code> <strong>and</strong> the <code>.docx</code> files on Canvas.</p>
-<p>We will be using many of the same packages you have used in previous labs. However, you’ll need to install a few MIP packages using the <code>install.packages()</code> function.</p>
+<p>We will be using many of the same packages you have used in previous labs. However, you’ll need to install a few Mixed Integer Programming-based Optimization (MIP) packages using the <code>install.packages()</code> function.</p>
 <pre class="r"><code># &quot;lapply&quot; applies the install.packages() function to a vector of packages
 # pkgs_to_install &lt;- c(&#39;ompr&#39;, &#39;ROI&#39;, &#39;ROI.plugin.glpk&#39;, &#39;ompr.roi&#39;)
 # lapply(pkgs_to_install, install.packages, character.only = TRUE)</code></pre>
@@ -221,17 +221,17 @@ subject to <span class="math inline">\(\sum_ix_iw_i&lt;=W\)</span><br />
 <span class="math inline">\(x_i \in \{0,1\}\)</span>, <span class="math inline">\(i=1,2,...n\)</span><br />
 <br />
 </p>
-<p>In other words, the summation of the number of items taken * their value, such that the weight of all the items is less than the maximum weight.<br />
+<p>In other words, the summation of whether each item was included * their value, such that the weight of all the items included is less than the maximum weight.<br />
 <br />
 </p>
 </div>
-<div id="b-mip-models-in-r" class="section level4">
-<h4><strong>(B) MIP models in R</strong></h4>
+<div id="b-mixed-integer-programming-models-in-r" class="section level4">
+<h4><strong>(B) Mixed Integer Programming models in R</strong></h4>
 <p><em>adapted from <a href="https://www.r-orms.org/mixed-integer-linear-programming/packages/modelling-milp/">this tutorial</a></em><br />
 <br />
 </p>
-<p>There are many languages and packages that can be used to implement Mixed Integer Programs. Today, we will use a slower, but more user-friendly package called <code>ompr</code>.</p>
-<p>You can think of a MIP Model as a big constraint maxtrix and a set of vectors. But you can also think of it as a set of decision variables, an objective function and a number of constraints as equations/inequalities. <code>ompr</code> implements the latter approach.</p>
+<p>There are many languages and packages that can be used to implement Mixed Integer Programs (MIPs:decision problems with a combination of integer decision variables and continuous objectives and/or constraints). Today, we will use a slower, but more user-friendly package called <code>ompr</code>.</p>
+<p>As you saw in lecture, and MIP formulation involves specifying decision variables, an objective function and a number of constraints as equations/inequalities. <code>ompr</code> takes your mathematical formulation and transforms it behind the scenes to a big constraint maxtrix and a set of vectors to solve it.</p>
 <p>This is the <code>ompr</code> equivalent of the Knapsack problem:</p>
 <pre class="r"><code>n &lt;- 10; W &lt;- 2
 v &lt;- runif(n);w &lt;- runif(n)
@@ -305,7 +305,7 @@ model &lt;- MIPModel() %&gt;%
 ## Model sense: maximize 
 ## Constraints: 1</code></pre>
 <p>NOTE: You can reuse any variable/object defined in your R environment within the MIP Model.</p>
-<p>Once you have a model, you pass it to a solver and get back a solutions. By default, the solver maximizes your chosen objective, but it can also minimize it. The main interface to extract variable values from a solution is the function <code>get_solution</code>. It returns a <code>data.frame</code> for indexed variables and thus makes it easy to subsequently use the values.<br />
+<p>Once you have a model, you pass it to a solver and get back a solution. By default, the solver maximizes your chosen objective, but it can also minimize it. The main interface to extract variable values from a solution is the function <code>get_solution</code>. It returns a <code>data.frame</code> for indexed variables and thus makes it easy to subsequently use the values.<br />
 <br />
 </p>
 </div>
@@ -357,7 +357,7 @@ result &lt;- MIPModel() %&gt;%
 </div>
 <div id="step-2-examine-solutions" class="section level4">
 <h4><strong>Step 2: examine solutions</strong></h4>
-<p>This code will show you which items were chosen (i.e. which decision variables set to a value of 1 by the model)</p>
+<p>This code will show you which items were chosen (i.e. which decision variables were set to a value of 1 by the model)</p>
 <pre class="r"><code>get_solution(result, x[i]) %&gt;% 
   dplyr::filter(value == 1) #show which of the decision variables were set to 1 (which objects were placed in the knapsack)</code></pre>
 <pre><code>##   variable  i value
@@ -429,7 +429,7 @@ The management of invasive species, when constrainted by a budget, can be concep
 <div id="step-1-fit-a-management-model-in-a-grid-with-9-sites" class="section level4">
 <h4><strong>Step 1: fit a management model in a grid with 9 sites</strong></h4>
 <p>Let’s reimagine the knapsack problem as a 3x3 grid of planning units. Each of these can be thought of as a separate ‘knapsack’ (though we’ll talk later about how dispersal makes this assumption invalid).</p>
-<p>Let’s first imagine we have a fixed budget of $50. While we will be focusing on a fixed budget approach here, note that there are also alternative approaches, like maximizing the ratio of benefits to costs, or maximizing the difference between benefits and costs, and these can be implemented just as easily in MIP. We can choose to apply an insecticide treatment to each of the cells that costs $10, or we can perform an aerial spray on the cell that costs $20. The first of these interventions causes 50% reduction in the pest population at each cell, whereas the second causes a 90% reduction in each cell.</p>
+<p>Let’s first imagine we have a fixed budget of $50. While we will be focusing on a fixed budget approach here, note that there are also alternative approaches, like maximizing the ratio of benefits to costs, or maximizing the difference between benefits and costs, and these can be implemented just as easily as mixed integer programs. Here, assume we can choose to apply an insecticide treatment to each of the cells that costs $10, or we can perform an aerial spray on the cell that costs $20. The first of these interventions causes 50% reduction in the pest population at each cell, whereas the second causes a 90% reduction in each cell.</p>
 <p>In other words, <span class="math inline">\(B=50\)</span> total budget<br />
 <span class="math inline">\(c_t = 10\)</span> cost of insecticide treatment<br />
 <span class="math inline">\(\epsilon_t = 0.5\)</span> efficiency of insecticide treatment<br />
@@ -696,7 +696,7 @@ assume <span class="math inline">\(v_{i,t}=x_{it}p_{it-1}\)</span><br />
 Try to convince yourself that this set of 3 inequalities actually ends up being equivalent to a multiplication of a binary and continuous variable by working through the different possible cases</p>
 <div id="questions-6" class="section level5">
 <h5><strong>Questions</strong></h5>
-<p><strong>(8)</strong> What is still lacking from the realism of this model?<br />
+<p><strong>(8)</strong> (optional if time) What is still lacking from the realism of this model?<br />
 <br />
 </p>
 </div>
@@ -753,17 +753,21 @@ plot(pestgrid, col=viridis(9), breaks=seq(0,1,length.out=10), main=&quot;Initial
 ## Long-step dual simplex will be used
 ## +   194: mip =     not found yet &gt;=              -inf        (1; 0)
 ## +   253: &gt;&gt;&gt;&gt;&gt;   9.800644876e+00 &gt;=   8.066050616e+00  17.7% (17; 0)
-## + 22562: mip =   9.800644876e+00 &gt;=   9.272379919e+00   5.4% (3040; 990)
+## + 13410: mip =   9.800644876e+00 &gt;=   9.137450162e+00   6.8% (1933; 517)
+## + 29176: mip =   9.800644876e+00 &gt;=   9.346048607e+00   4.6% (3793; 1381)
 ## + 37488: &gt;&gt;&gt;&gt;&gt;   9.798498277e+00 &gt;=   9.410482308e+00   4.0% (4641; 1913)
-## + 53912: mip =   9.798498277e+00 &gt;=   9.520003041e+00   2.8% (6244; 3263)
-## + 67447: mip =   9.798498277e+00 &gt;=   9.583456531e+00   2.2% (7597; 4666)
-## + 76303: mip =   9.798498277e+00 &gt;=   9.620850194e+00   1.8% (8487; 5819)
-## + 84302: mip =   9.798498277e+00 &gt;=   9.651129251e+00   1.5% (8959; 7107)
-## + 94679: mip =   9.798498277e+00 &gt;=   9.686331854e+00   1.1% (8724; 9604)
-## +104657: mip =   9.798498277e+00 &gt;=   9.717510116e+00   0.8% (7401; 13116)
-## +112764: mip =   9.798498277e+00 &gt;=   9.740645262e+00   0.6% (5666; 17143)
-## +120899: mip =   9.798498277e+00 &gt;=   9.762300846e+00   0.4% (3841; 21748)
-## +131048: mip =   9.798498277e+00 &gt;=   9.786441980e+00   0.1% (1415; 28707)
+## + 49395: mip =   9.798498277e+00 &gt;=   9.495991819e+00   3.1% (5830; 2860)
+## + 59283: mip =   9.798498277e+00 &gt;=   9.545805530e+00   2.6% (6783; 3794)
+## + 69445: mip =   9.798498277e+00 &gt;=   9.591418455e+00   2.1% (7798; 4904)
+## + 77219: mip =   9.798498277e+00 &gt;=   9.625125781e+00   1.8% (8555; 5956)
+## + 84421: mip =   9.798498277e+00 &gt;=   9.651432694e+00   1.5% (8966; 7121)
+## + 91967: mip =   9.798498277e+00 &gt;=   9.677454453e+00   1.2% (8868; 8858)
+## +105682: mip =   9.798498277e+00 &gt;=   9.720515993e+00   0.8% (7196; 13565)
+## +111248: mip =   9.798498277e+00 &gt;=   9.736790373e+00   0.6% (5988; 16356)
+## +118332: mip =   9.798498277e+00 &gt;=   9.755872251e+00   0.4% (4416; 20258)
+## Time used: 60.0 secs.  Memory used: 9.8 Mb.
+## +126805: mip =   9.798498277e+00 &gt;=   9.776738993e+00   0.2% (2451; 25514)
+## +134400: mip =   9.798498277e+00 &gt;=   9.793722112e+00 &lt; 0.1% (592; 32032)
 ## +136712: mip =   9.798498277e+00 &gt;=     tree is empty   0.0% (0; 35747)
 ## INTEGER OPTIMAL SOLUTION FOUND
 ## &lt;!SOLVER MSG&gt; ----</code></pre>
@@ -898,7 +902,8 @@ The impact of management is best viewed by comparing the above with the outcome 
 <h4><strong>Questions</strong></h4>
 <p><strong>(10)</strong> How much did management reduce total pest density across space and time?</p>
 <p><strong>(11)</strong> Why might a site that has lower pest density at a given timestep be selected for management instead of one with higher pest density when accounting for dispersal? Think about how sites may get reinvaded from neighbouring sites.</p>
-<p><strong>(12)</strong> Describe which parameters you would change to improve the objective function further. If you are feeling brave, try changing these and resolving the model in the code chunk below!</p>
+<p><strong>(12)</strong> (optional if time) Describe which parameters you would change to improve the objective function further. If you are feeling brave, try changing these and resolving the model in the code chunk below!</p>
+<p><strong>(13)</strong> Discuss your overall results from this lab exercise as well as some potential applications of management optimization models.</p>
 </div>
 </div>
 
