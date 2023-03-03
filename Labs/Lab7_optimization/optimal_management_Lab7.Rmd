@@ -118,7 +118,7 @@ MIPModel() %>%
 
 **Variable types**
 
-Variables can be of type continuous, integer or binary.
+Variables can be continuous, integer or binary.
 
 ```{r}
 MIPModel() %>% 
@@ -149,7 +149,7 @@ MIPModel() %>%
 
 **Summation over variables**
 
-If you have indexed variables, then you often want to sum over a subset of variables.The following code creates a model with three decision variables $x_1, x_2, x_3$, an objective function, *maximize* $\sum_ix$, and one constraint $\sum_{i=1}^{3}x_i<=10$ 
+If you have indexed variables, then you often want to sum over a subset of variables.The following code creates a model with three decision variables $x_1, x_2, x_3$, an objective function, *maximize* $\sum_ix_i$, and one constraint $\sum_{i=1}^{3}x_i<=10$ 
 
 ```{r}
 MIPModel() %>% 
@@ -175,11 +175,11 @@ set.seed(1) # set a defined random seed for replicability of solutions
 n <- 10 # the number of possible items to choose from
 weights <- rpois(n, 5) # create some random data for knapsack weights by sampling from the Poisson distribution
 benefits<-runif(n, 0, 10) # create some random data for the benefit associated with each of the objects
-cbind(weights,benefits) #print weights an values
+cbind(weights,benefits) #print weights and values
 max_weight<-30 # fix some total budget
 result <- MIPModel() %>% 
   add_variable(x[i], i = 1:n, type = "binary") %>%  # define decision variable x as binary
-    add_constraint(sum_expr(weights[i]*x[i], i=1:n)<=max_weight) %>%  # define decision variable x as binary
+    add_constraint(sum_expr(weights[i]*x[i], i=1:n)<=max_weight) %>%  # set the weight constraint
   set_objective(sum_expr(benefits[i] * x[i], i = 1:n)) %>% #specify your objective
   solve_model(with_ROI("glpk", verbose = TRUE))
 ```
@@ -237,7 +237,7 @@ In a simple case with a small number of planning units, this problem can be solv
 
 #### **Step 1: fit a management model in a grid with 9 sites**
 
-Let's reimagine the knapsack problm as a 3x3 grid of planning units. Each of these can be thought of as a separate 'knapsack' (though we'll talk later about how dispersal makes this assumption invalid). 
+Let's reimagine the knapsack problem as a 3x3 grid of planning units. Each of these can be thought of as a separate 'knapsack' (though we'll talk later about how dispersal makes this assumption invalid). 
 
 Let's first imagine we have a fixed budget of \$50. While we will be focusing on a fixed budget approach here, note that there are also alternative approaches, like maximizing the ratio of benefits to costs, or maximizing the difference between benefits and costs, and these can be implemented just as easily in MIP. We can choose to apply an insecticide treatment to each of the cells that costs \$10, or we can perform an aerial spray on the cell that costs $20. The first of these interventions causes 50% reduction in the pest population at each cell, whereas the second causes a 90% reduction in each cell. 
 
@@ -252,7 +252,7 @@ $c_s = 20$ cost of insecticide treatment
 \
 $\epsilon_s = 0.9$ efficiency of aerial spray
 
-Let's also assume that we previous collected data on (or had modelled) the relative abundance of the pest across sites.
+Let's also assume that we previously collected data on (or had modelled) the relative abundance of the pest across sites.
 
 $p0 = (p0_{i=1}, p0_{i=2},...p0_{i=n})$\
 
@@ -260,7 +260,7 @@ Where $p0_i$ represents a continuous pest relative abundance between 0 and 1 (yo
 
 One possible objective function for this model is the following:
 
-$minimize$   $\sum_ip_i*h_i$\
+$minimize$   $\sum_ip_ih_i$\
 
 Where $p_i$ represents a continuous pest relative abundance between 0 and 1 (you can assume 1 is the carrying capacity) in cell $i$ after management, and $h_i$ is the host abundance in cell $i$.
 \
@@ -395,7 +395,7 @@ legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'da
 
 **(7)** How do these results compare to your predictions? If they differ, why do you think they do?
 
-**(8)** In the code chunk below, rerun this model with a budget of 100, reducing the efficiency of insecticide to 25%. (HINT: you can copy and paste the entire model code as is, the only thing you need to change are the constants you set earlier, `B` and `e_t`)
+**(8)** In the code chunk below, rerun this model with a budget of 100, reducing the efficiency of insecticide to 25%. (NOTE: in the code below, you must change the constants you set earlier for the budget and efficiency of insecticide. Otherwise, this code will rerun the same model as above.)
 
 ```{r}
 B2=B # modify the righthand side of this line to your new budget instead of B
@@ -459,9 +459,9 @@ legend('topright',pch=21, legend=c("insecticide", 'spray'), pt.bg=c('white', 'da
 
 ### **Exercise 3: Add realism **
 
-At this stage, the model specification is already quite complex, but we haven't accounted for much of what makes invasion management problems difficult! Namely, we need to look at the role of temporal and spatial non-independence. That is, management at one time and place has often-unpredictable feedbacks on every other location across time.
+At this stage, we already have quite a few equations, but we haven't accounted for much of what makes invasion management problems difficult! Namely, we need to look at the role of temporal and spatial non-independence. That is, management at one time and place has often-unpredictable feedbacks on every other location across time.
 
-In invasions, this is not just due to population recovery through growth, but also because of dispersal. Both of these processes make the specification of linear problems quite difficult (as you saw in lecture)
+In invasions, this is not just due to population recovery through growth, but also because of dispersal. Both of these processes make the specification of linear problems quite difficult (as you saw in my lecture).
 
 Below is a model on a 4x4 grid where the pest population starts off from a point source and spreads to neighbouring cells at each timestep. Pest populations grow by a constant rate at each timestep (exponential growth). Even this very crude representation requires some interesting representations.
 
@@ -492,14 +492,14 @@ This model may look mathematically simple, but it is technically a **nonlinear**
         $p_{it}=0.4p_{it-1}r-0.4\epsilon_tr(x_ip_{it-1})+r\sum_j{0.1A_{ji}p_{jt-1}-0.1A_{jt}\epsilon_t(x_ip_{jt-1}))}$
 \
 \
-The issue here is that in the expression $x_{it}p_{it-1}$, two variables (not constants) are being multiplied by one another. This is what it means for an MIP to be nonlinear. One of these, $x_{it}$ is binary, and the other p_{it-1} is continuous. Thus, we must convert this expression into a non-multiplicative formulation using a series of inequalities.
+The issue here is that in the expression $x_{it}p_{it-1}$, two variables (not constants) are being multiplied by one another. This is what it means for an MIP to be nonlinear. One of these, $x_{it}$ is binary, and the other $p_{it-1}$ is continuous. Thus, we must convert this expression into a non-multiplicative formulation using a series of inequalities.
 \
 \
         assume $v_{i,t}=x_{it}p_{it-1}$\
         \
         $v_{it}<=x_{it}M$     When the site is not managed ($x_{it}=0$), this term is 0, when the site is managed ($x_{it}=1$), this term is smaller than some arbitrarily big number M (this is called a big-M constraint)\
         $v_{it}<=p_{it-1}$    $v_{it}$ is never greater than $p_{it-1}$\
-        $v_{it}>=p_{it-1}-M(1-x_{it})$    This allows $v_it$ to be set to zero when $x_{it}$ is zero, and for $v_{it}$ to be exactly $p_{it-1} when $x_{it}$ is 1\
+        $v_{it}>=p_{it-1}-M(1-x_{it})$    This allows $v_it$ to be set to zero when $x_{it}$ is zero, and for $v_{it}$ to be exactly $p_{it-1}$ when $x_{it}$ is 1\
         \
 Try to convince yourself that this set of 3 inequalities actually ends up being equivalent to a multiplication of a binary and continuous variable by working through the different possible cases
 
