@@ -676,7 +676,7 @@ But simplify to one type of management:<br />
 <br />
 subject to <span class="math inline">\(p_{it}=(0.6p_{it-1}(1-x_i\epsilon_t)+\sum_j{0.1A_{ji}p_{jt-1}(1-x_j\epsilon_t)})r\)</span><br />
 <span class="math inline">\(p_{i1} = p0_i\)</span>, the initial conditions of pest density<br />
-<span class="math inline">\(\sum_it_ic_t&lt;=B\)</span>, the budget constraint<br />
+<span class="math inline">\(\sum_ix_ic_t&lt;=B\)</span>, the budget constraint<br />
 <span class="math inline">\(x_i \in \{0,1\}\)</span>, the decision to manage at each site<br />
 <span class="math inline">\(A_{ij} \in {0,1}\)</span>, an adjacency matrix (1s whenever two cells are adjacent to one another and 0s otherwise)<br />
 <br />
@@ -753,11 +753,9 @@ plot(pestgrid, col=viridis(9), breaks=seq(0,1,length.out=10), main=&quot;Initial
 ## Long-step dual simplex will be used
 ## +   189: mip =     not found yet &gt;=              -inf        (1; 0)
 ## +   250: &gt;&gt;&gt;&gt;&gt;   1.354818293e+01 &gt;=   1.073323598e+01  20.8% (17; 0)
-## + 24466: mip =   1.354818293e+01 &gt;=   1.285301774e+01   5.1% (2299; 1181)
-## + 42483: mip =   1.354818293e+01 &gt;=   1.319460317e+01   2.6% (3290; 2894)
-## + 48541: mip =   1.354818293e+01 &gt;=   1.329900040e+01   1.8% (3207; 3981)
-## + 53956: mip =   1.354818293e+01 &gt;=   1.338754801e+01   1.2% (2339; 6029)
-## + 60377: mip =   1.354818293e+01 &gt;=   1.349049922e+01   0.4% (964; 9732)
+## + 28586: mip =   1.354818293e+01 &gt;=   1.293487974e+01   4.5% (2518; 1459)
+## + 45028: mip =   1.354818293e+01 &gt;=   1.323994271e+01   2.3% (3350; 3267)
+## + 55166: mip =   1.354818293e+01 &gt;=   1.340627733e+01   1.0% (2081; 6666)
 ## + 64628: mip =   1.354818293e+01 &gt;=     tree is empty   0.0% (0; 14085)
 ## INTEGER OPTIMAL SOLUTION FOUND
 ## &lt;!SOLVER MSG&gt; ----</code></pre>

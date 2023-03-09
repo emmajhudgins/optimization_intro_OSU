@@ -480,7 +480,7 @@ minimize   $\sum_{t=1}^5\sum_ip_i$,  Disregard hosts for simplicity\
 \
 subject to $p_{it}=(0.6p_{it-1}(1-x_i\epsilon_t)+\sum_j{0.1A_{ji}p_{jt-1}(1-x_j\epsilon_t)})r$\
            $p_{i1} = p0_i$,   the initial conditions of pest density\
-           $\sum_it_ic_t<=B$,  the budget constraint\
+           $\sum_ix_ic_t<=B$,  the budget constraint\
            $x_i \in \{0,1\}$,  the decision to manage at each site\
           $A_{ij} \in {0,1}$,  an adjacency matrix (1s whenever two cells are adjacent to one another and 0s otherwise)\
 \
