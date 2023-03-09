@@ -7,3 +7,6 @@ See the knitted Lab [here](https://htmlpreview.github.io/?https://github.com/emm
 Lecture recording available [here](https://mediaspace.carleton.ca/media/MIP+Intro+OSU/1_z9hphgiu)
 
 Slides [here](https://github.com/emmajhudgins/optimization_intro_OSU/files/10934371/lecture_osu_shortened-compressed.pdf)
+
+Please credit me (or the original source where I adapted parts from) upon reuse!
+
