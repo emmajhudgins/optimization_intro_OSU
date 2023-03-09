@@ -478,18 +478,18 @@ And add the following:
 
 minimize   $\sum_{t=1}^5\sum_ip_i$,  Disregard hosts for simplicity\
 \
-subject to $p_{it}=(0.4p_{it-1}(1-x_i\epsilon_t)+\sum_j{0.1A_{ji}p_{jt-1}(1-x_j\epsilon_t)})r$\
+subject to $p_{it}=(0.6p_{it-1}(1-x_i\epsilon_t)+\sum_j{0.1A_{ji}p_{jt-1}(1-x_j\epsilon_t)})r$\
            $p_{i1} = p0_i$,   the initial conditions of pest density\
            $\sum_it_ic_t<=B$,  the budget constraint\
            $x_i \in \{0,1\}$,  the decision to manage at each site\
           $A_{ij} \in {0,1}$,  an adjacency matrix (1s whenever two cells are adjacent to one another and 0s otherwise)\
 \
-This model assumes that at each timestep, a cell disperses 10% of its own propagules to each of its 6 immediate neighbour cells, such that 40% of the population remains. This new density then grows by the growth rate. Let's assume that cells along edges still lose propagules but that they die off beyond the grid.   
+This model assumes that at each timestep, a cell disperses 10% of its own propagules to each of its 4 immediate neighbour cells, such that 60% of the population remains. This new density then grows by the growth rate. Let's assume that cells along edges still lose propagules but that they die off beyond the grid.   
 
 This model may look mathematically simple, but it is technically a **nonlinear** problem that cannot be solved by `ompr` without several additional linearization equations. This is because the first line of the constraint section can be rewritten as: 
 \
 \
-        $p_{it}=0.4p_{it-1}r-0.4\epsilon_tr(x_ip_{it-1})+r\sum_j{0.1A_{ji}p_{jt-1}-0.1A_{jt}\epsilon_t(x_ip_{jt-1}))}$
+        $p_{it}=0.6p_{it-1}r-0.6\epsilon_tr(x_ip_{it-1})+r\sum_j{0.1A_{ji}p_{jt-1}-0.1A_{jt}\epsilon_t(x_ip_{jt-1}))}$
 \
 \
 The issue here is that in the expression $x_{it}p_{it-1}$, two variables (not constants) are being multiplied by one another. This is what it means for an MIP to be nonlinear. One of these, $x_{it}$ is binary, and the other $p_{it-1}$ is continuous. Thus, we must convert this expression into a non-multiplicative formulation using a series of inequalities.
@@ -542,7 +542,7 @@ pest_mod3 <- MIPModel() %>%
   add_variable(x[i,t], i = 1:n, t=1:5,type = "binary") %>%  # define decision variable x as binary
   add_variable(p[i,t], i = 1:n, t=1:5,type = "continuous", lb=0, ub=M) %>%  # define the pest density variable as a continuous value between 0 and 1
  add_variable(v[i,t], i = 1:n, t=1:5,type = "continuous", lb=0, ub=M) %>%  # define your linearized variable v similar to p
-  add_constraint(p[i,t]>=0.4*p[i,t-1]*r-0.4*e*r*v[i,t]+r*sum_expr(0.1*A[j,i]*p[j,t-1]-0.1*A[j,i]*e*v[j,t], j=1:n), i=1:n, t=2:5) %>%  # effect of management on pest density
+  add_constraint(p[i,t]>=0.6*p[i,t-1]*r-0.6*e*r*v[i,t]+r*sum_expr(0.1*A[j,i]*p[j,t-1]-0.1*A[j,i]*e*v[j,t], j=1:n), i=1:n, t=2:5) %>%  # effect of management on pest density
   add_constraint(p[i,t]==p0[i], i=1:n, t=1) %>%  # initial pest density
   add_constraint(v[i,t]<=M*x[i,t], i=1:n, t=2:5) %>%  #linearization
   add_constraint(v[i,t]<=p[i,t], i=1:n, t=2:5) %>%
@@ -563,23 +563,23 @@ Finally, let's visualize our optimal solutions!
 
 objective_value(pest_mod3) # examine the objective value at the optimum
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,1])), col=viridis(9), main="Pest density time 1",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,1])), col=viridis(19), main="Pest density time 1",  breaks=seq(0,4,length.out=20)) # pest density after management
 points(x=coordinates(grid)[sites$i[which(sites$t==1)],1], y=coordinates(grid)[sites$i[which(sites$t==1)],2], bg="white", pch=21, cex=3)
 legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,2])), col=viridis(9), main="Pest density time 2",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,2])), col=viridis(19), main="Pest density time 2",  breaks=seq(0,4,length.out=20)) # pest density after management
 points(x=coordinates(grid)[sites$i[which(sites$t==2)],1], y=coordinates(grid)[sites$i[which(sites$t==2)],2], bg="white", pch=21, cex=3)
 legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,3])), col=viridis(9), main="Pest density time 3",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,3])), col=viridis(19), main="Pest density time 3",  breaks=seq(0,4,length.out=20)) # pest density after management
 points(x=coordinates(grid)[sites$i[which(sites$t==3)],1], y=coordinates(grid)[sites$i[which(sites$t==3)],2], bg="white", pch=21, cex=3)
 legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,4])), col=viridis(9), main="Pest density time 4",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,4])), col=viridis(19), main="Pest density time 4",  breaks=seq(0,4,length.out=20)) # pest density after management
 points(x=coordinates(grid)[sites$i[which(sites$t==4)],1], y=coordinates(grid)[sites$i[which(sites$t==4)],2], bg="white", pch=21, cex=3)
 legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,5])), col=viridis(9), main="Pest density time 5",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den3[,5])), col=viridis(19), main="Pest density time 5",  breaks=seq(0,4,length.out=20)) # pest density after management
 points(x=coordinates(grid)[sites$i[which(sites$t==5)],1], y=coordinates(grid)[sites$i[which(sites$t==5)],2], bg="white", pch=21, cex=3)
 legend('topright',pch=21, legend=c("manage"), pt.bg=c('white'))
 
@@ -593,7 +593,7 @@ pest_mod_nobudget <- MIPModel() %>%
   add_variable(x[i,t], i = 1:n, t=1:5,type = "binary") %>%  # define decision variable x as binary
   add_variable(p[i,t], i = 1:n, t=1:5,type = "continuous", lb=0, ub=M) %>%  # define the pest density variable as a continuous value between 0 and 1
  add_variable(v[i,t], i = 1:n, t=1:5,type = "continuous", lb=0, ub=M) %>%  # define your linearized variable v similar to p
-  add_constraint(p[i,t]>=0.4*p[i,t-1]*r-0.4*e*r*v[i,t]+r*sum_expr(0.1*A[j,i]*p[j,t-1]-0.1*A[j,i]*e*v[j,t], j=1:n), i=1:n, t=2:5) %>%  # effect of management on pest density
+  add_constraint(p[i,t]>=0.6*p[i,t-1]*r-0.6*e*r*v[i,t]+r*sum_expr(0.1*A[j,i]*p[j,t-1]-0.1*A[j,i]*e*v[j,t], j=1:n), i=1:n, t=2:5) %>%  # effect of management on pest density
   add_constraint(p[i,t]==p0[i], i=1:n, t=1) %>%  # initial pest density
   add_constraint(v[i,t]<=M*x[i,t], i=1:n, t=2:5) %>%  #linearization
   add_constraint(v[i,t]<=p[i,t], i=1:n, t=2:5) %>%
@@ -609,15 +609,15 @@ pest_mod_nobudget <- MIPModel() %>%
 
 objective_value(pest_mod_nobudget) # examine the objective value without management
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,1])), col=viridis(9), main="Pest density time 1",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,1])), col=viridis(19), main="Pest density time 1",  breaks=seq(0,4,length.out=20)) # pest density without management
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,2])), col=viridis(9), main="Pest density time 2",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,2])), col=viridis(19), main="Pest density time 2",  breaks=seq(0,4,length.out=20)) # pest density without management
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,3])), col=viridis(9), main="Pest density time 3",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,3])), col=viridis(19), main="Pest density time 3",  breaks=seq(0,4,length.out=20)) # pest density without management
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,4])), col=viridis(9), main="Pest density time 4",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,4])), col=viridis(19), main="Pest density time 4",  breaks=seq(0,4,length.out=20)) # pest density without management
 
-plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,5])), col=viridis(9), main="Pest density time 5",  breaks=seq(0,1.5,length.out=10)) # pest density after management
+plot(SpatialGridDataFrame(grid, data.frame(pest_den_nobudget[,5])), col=viridis(19), main="Pest density time 5",  breaks=seq(0,4,length.out=20)) # pest density without management
 
 ```
 
